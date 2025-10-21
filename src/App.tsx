@@ -822,9 +822,6 @@ function App() {
         <p>© 2025 CASHMATRIX - Revolutionary Payment Gateway</p>
         <p className="mt-2">Powered by Ramp Network & 1inch</p>
       </footer>
-    </div>
-  );
-}
 {/* Peanut Protocol Section */}
 <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8">
   <h3 className="text-white text-2xl font-bold mb-6 flex items-center gap-3">
@@ -958,5 +955,8 @@ function App() {
   </div>
 )}
 
+    </div>
+  );
+}
+
 export default App;
-// Build: Wed Oct 22 01:43:48 AM +04 2025
