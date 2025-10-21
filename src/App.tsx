@@ -50,61 +50,75 @@ function App() {
   const [jusdcFormatted, setJusdcFormatted] = useState("0.00");
   const totalValue = (parseFloat(usdcFormatted) + parseFloat(jusdcFormatted)).toFixed(2);
 
-  // Manual balance fetching function
-  async function fetchBalances() {
-    if (!address || !chainId || !window.ethereum) {
-      setUsdcFormatted("0.00");
-      setJusdcFormatted("0.00");
-      return;
-    }
-
-    try {
-      const provider = new ethers.providers.Web3Provider(window.ethereum as any);
-
-      // Fetch USDC balance
-      const usdcAddress = USDC_ADDRESSES[chainId as keyof typeof USDC_ADDRESSES];
-      if (usdcAddress) {
-        try {
-          const usdcContract = new ethers.Contract(
-            usdcAddress,
-            ["function balanceOf(address) view returns (uint256)"],
-            provider
-          );
-          const usdcBalance = await usdcContract.balanceOf(address);
-          const usdcValue = ethers.utils.formatUnits(usdcBalance, 6);
-          setUsdcFormatted(parseFloat(usdcValue).toFixed(2));
-          console.log(`💵 USDC on ${NETWORK_NAMES[chainId]}:`, usdcValue);
-        } catch (error) {
-          console.error("USDC fetch error:", error);
-          setUsdcFormatted("0.00");
-        }
-      }
-
-      // Fetch JUSDC balance
-      const jusdcAddress = JUSDC_ADDRESSES[chainId];
-      if (jusdcAddress) {
-        try {
-          const jusdcContract = new ethers.Contract(
-            jusdcAddress,
-            ["function balanceOf(address) view returns (uint256)"],
-            provider
-          );
-          const jusdcBalance = await jusdcContract.balanceOf(address);
-          const decimals = JUSDC_DECIMALS[chainId] || 6;
-          const jusdcValue = ethers.utils.formatUnits(jusdcBalance, decimals);
-          setJusdcFormatted(parseFloat(jusdcValue).toFixed(2));
-          console.log(`💎 JUSDC on ${NETWORK_NAMES[chainId]} (${decimals} decimals):`, jusdcValue);
-        } catch (error) {
-          console.error("JUSDC fetch error:", error);
-          setJusdcFormatted("0.00");
-        }
-      }
-    } catch (error) {
-      console.error("❌ Error fetching balances:", error);
-      setUsdcFormatted("0.00");
-      setJusdcFormatted("0.00");
-    }
+// Manual balance fetching function
+async function fetchBalances() {
+  if (!address || !chainId || !window.ethereum) {
+    setUsdcFormatted("0.00");
+    setJusdcFormatted("0.00");
+    return;
   }
+
+  try {
+    const provider = new ethers.providers.Web3Provider(window.ethereum as any);
+
+    // Fetch USDC balance
+    const usdcAddress = USDC_ADDRESSES[chainId as keyof typeof USDC_ADDRESSES];
+    if (usdcAddress) {
+      try {
+        const usdcContract = new ethers.Contract(
+          usdcAddress,
+          ["function balanceOf(address) view returns (uint256)"],
+          provider
+        );
+        const usdcBalance = await usdcContract.balanceOf(address);
+        const usdcValue = ethers.utils.formatUnits(usdcBalance, 6);
+        setUsdcFormatted(parseFloat(usdcValue).toFixed(2));
+        console.log(`💵 USDC on ${NETWORK_NAMES[chainId]}:`, usdcValue);
+      } catch (error) {
+        console.error("USDC fetch error:", error);
+        setUsdcFormatted("0.00");
+      }
+    }
+
+    // Fetch JUSDC balance with existence check
+    const jusdcAddress = JUSDC_ADDRESSES[chainId];
+    if (jusdcAddress) {
+      try {
+        // ✅ ADDED: Check if contract exists first
+        const code = await provider.getCode(jusdcAddress);
+        
+        if (code === '0x' || code === '0x0') {
+          // Contract doesn't exist on this network
+          console.log(`⚠️ JUSDC not deployed on ${NETWORK_NAMES[chainId]}`);
+          setJusdcFormatted("0.00"); // Show 0 instead of error
+          return;
+        }
+
+        // Contract exists, fetch balance
+        const jusdcContract = new ethers.Contract(
+          jusdcAddress,
+          ["function balanceOf(address) view returns (uint256)"],
+          provider
+        );
+        const jusdcBalance = await jusdcContract.balanceOf(address);
+        const decimals = JUSDC_DECIMALS[chainId] || 6;
+        const jusdcValue = ethers.utils.formatUnits(jusdcBalance, decimals);
+        setJusdcFormatted(parseFloat(jusdcValue).toFixed(2));
+        console.log(`💎 JUSDC on ${NETWORK_NAMES[chainId]} (${decimals} decimals):`, jusdcValue);
+      } catch (error: any) {
+        console.error("JUSDC fetch error:", error.message || error);
+        setJusdcFormatted("0.00"); // Show 0 on error
+      }
+    } else {
+      setJusdcFormatted("0.00");
+    }
+  } catch (error) {
+    console.error("❌ Error fetching balances:", error);
+    setUsdcFormatted("0.00");
+    setJusdcFormatted("0.00");
+  }
+}
+
 
   // Fetch balances when wallet/network changes
   useEffect(() => {
