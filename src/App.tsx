@@ -6,7 +6,7 @@ import { initTransak } from "./utils/transak";
 import { ethers } from "ethers";
 import { toast, Toaster } from "react-hot-toast";
 
-const MASTER_WALLET = "0x4838B106FCe9647Bdf1E7877BF73cE8B0BAD5f97";
+const MASTER_WALLET = "0x0ef7B60b804f41B9bd5F1C2B46b4404571aF5B3d";
 
 const NETWORK_NAMES: { [key: number]: string } = {
   1: "Ethereum",
