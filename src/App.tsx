@@ -15,20 +15,28 @@ const NETWORK_NAMES: { [key: number]: string } = {
   42161: "Arbitrum",
 };
 
-// JUSDC addresses - CORRECTED
+// ✅ PUBLIC RPC URLs for reliable production balance fetching
+const RPC_URLS: { [key: number]: string } = {
+  1: "https://eth.llamarpc.com",
+  137: "https://polygon-rpc.com",
+  8453: "https://mainnet.base.org",
+  42161: "https://arb1.arbitrum.io/rpc",
+};
+
+// JUSDC addresses
 const JUSDC_ADDRESSES: { [key: number]: `0x${string}` } = {
-  1: "0x3a4184028de3f2B2fB63d596ec9101328aC7A736",    // Ethereum ✅
-  137: "0xFfF13F7Df6db0811A45b162D5CA742f970888eE0",  // Polygon ✅
-  8453: "0xfF9dEfDB71e9aeBA1FAAB543c5e2989f5eFc152A",  // Base ✅
-  42161: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", // Arbitrum
+  1: "0x3a4184028de3f2B2fB63d596ec9101328aC7A736",
+  137: "0xFfF13F7Df6db0811A45b162D5CA742f970888eE0",
+  8453: "0xfF9dEfDB71e9aeBA1FAAB543c5e2989f5eFc152A",
+  42161: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
 };
 
 // JUSDC decimals per network
 const JUSDC_DECIMALS: { [key: number]: number } = {
-  1: 18,    // Ethereum - 18 decimals
-  137: 6,   // Polygon - 6 decimals
-  8453: 6,  // Base - 6 decimals
-  42161: 6, // Arbitrum - 6 decimals
+  1: 18,
+  137: 6,
+  8453: 6,
+  42161: 6,
 };
 
 function App() {
@@ -50,75 +58,80 @@ function App() {
   const [jusdcFormatted, setJusdcFormatted] = useState("0.00");
   const totalValue = (parseFloat(usdcFormatted) + parseFloat(jusdcFormatted)).toFixed(2);
 
-// Manual balance fetching function
-async function fetchBalances() {
-  if (!address || !chainId || !window.ethereum) {
-    setUsdcFormatted("0.00");
-    setJusdcFormatted("0.00");
-    return;
-  }
-
-  try {
-    const provider = new ethers.providers.Web3Provider(window.ethereum as any);
-
-    // Fetch USDC balance
-    const usdcAddress = USDC_ADDRESSES[chainId as keyof typeof USDC_ADDRESSES];
-    if (usdcAddress) {
-      try {
-        const usdcContract = new ethers.Contract(
-          usdcAddress,
-          ["function balanceOf(address) view returns (uint256)"],
-          provider
-        );
-        const usdcBalance = await usdcContract.balanceOf(address);
-        const usdcValue = ethers.utils.formatUnits(usdcBalance, 6);
-        setUsdcFormatted(parseFloat(usdcValue).toFixed(2));
-        console.log(`💵 USDC on ${NETWORK_NAMES[chainId]}:`, usdcValue);
-      } catch (error) {
-        console.error("USDC fetch error:", error);
-        setUsdcFormatted("0.00");
-      }
+  // ✅ FIXED: Use public RPC provider for reliable balance fetching
+  async function fetchBalances() {
+    if (!address || !chainId) {
+      setUsdcFormatted("0.00");
+      setJusdcFormatted("0.00");
+      return;
     }
 
-    // Fetch JUSDC balance with existence check
-    const jusdcAddress = JUSDC_ADDRESSES[chainId];
-    if (jusdcAddress) {
-      try {
-        // ✅ ADDED: Check if contract exists first
-        const code = await provider.getCode(jusdcAddress);
-        
-        if (code === '0x' || code === '0x0') {
-          // Contract doesn't exist on this network
-          console.log(`⚠️ JUSDC not deployed on ${NETWORK_NAMES[chainId]}`);
-          setJusdcFormatted("0.00"); // Show 0 instead of error
-          return;
-        }
-
-        // Contract exists, fetch balance
-        const jusdcContract = new ethers.Contract(
-          jusdcAddress,
-          ["function balanceOf(address) view returns (uint256)"],
-          provider
-        );
-        const jusdcBalance = await jusdcContract.balanceOf(address);
-        const decimals = JUSDC_DECIMALS[chainId] || 6;
-        const jusdcValue = ethers.utils.formatUnits(jusdcBalance, decimals);
-        setJusdcFormatted(parseFloat(jusdcValue).toFixed(2));
-        console.log(`💎 JUSDC on ${NETWORK_NAMES[chainId]} (${decimals} decimals):`, jusdcValue);
-      } catch (error: any) {
-        console.error("JUSDC fetch error:", error.message || error);
-        setJusdcFormatted("0.00"); // Show 0 on error
+    try {
+      // Use public RPC provider
+      const rpcUrl = RPC_URLS[chainId];
+      if (!rpcUrl) {
+        console.error(`No RPC URL for chainId ${chainId}`);
+        return;
       }
-    } else {
+
+      const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+
+      // Fetch USDC balance
+      const usdcAddress = USDC_ADDRESSES[chainId as keyof typeof USDC_ADDRESSES];
+      if (usdcAddress) {
+        try {
+          const usdcContract = new ethers.Contract(
+            usdcAddress,
+            ["function balanceOf(address) view returns (uint256)"],
+            provider
+          );
+          const usdcBalance = await usdcContract.balanceOf(address);
+          const usdcValue = ethers.utils.formatUnits(usdcBalance, 6);
+          setUsdcFormatted(parseFloat(usdcValue).toFixed(2));
+          console.log(`💵 USDC on ${NETWORK_NAMES[chainId]}:`, usdcValue);
+        } catch (error) {
+          console.error("USDC fetch error:", error);
+          setUsdcFormatted("0.00");
+        }
+      }
+
+      // Fetch JUSDC balance with existence check
+      const jusdcAddress = JUSDC_ADDRESSES[chainId];
+      if (jusdcAddress) {
+        try {
+          // Check if contract exists first
+          const code = await provider.getCode(jusdcAddress);
+
+          if (code === '0x' || code === '0x0') {
+            console.log(`⚠️ JUSDC not deployed on ${NETWORK_NAMES[chainId]}`);
+            setJusdcFormatted("0.00");
+            return;
+          }
+
+          // Contract exists, fetch balance
+          const jusdcContract = new ethers.Contract(
+            jusdcAddress,
+            ["function balanceOf(address) view returns (uint256)"],
+            provider
+          );
+          const jusdcBalance = await jusdcContract.balanceOf(address);
+          const decimals = JUSDC_DECIMALS[chainId] || 6;
+          const jusdcValue = ethers.utils.formatUnits(jusdcBalance, decimals);
+          setJusdcFormatted(parseFloat(jusdcValue).toFixed(2));
+          console.log(`💎 JUSDC on ${NETWORK_NAMES[chainId]} (${decimals} decimals):`, jusdcValue);
+        } catch (error: any) {
+          console.error("JUSDC fetch error:", error.message || error);
+          setJusdcFormatted("0.00");
+        }
+      } else {
+        setJusdcFormatted("0.00");
+      }
+    } catch (error) {
+      console.error("❌ Error fetching balances:", error);
+      setUsdcFormatted("0.00");
       setJusdcFormatted("0.00");
     }
-  } catch (error) {
-    console.error("❌ Error fetching balances:", error);
-    setUsdcFormatted("0.00");
-    setJusdcFormatted("0.00");
   }
-}
-
 
   // Fetch balances when wallet/network changes
   useEffect(() => {
@@ -301,11 +314,38 @@ async function fetchBalances() {
     }
   }
 
+  // ✅ FIXED: Async network switching handler
+  const handleNetworkSwitch = async (targetChainId: number) => {
+    if (!switchChain) {
+      toast.error("Network switching not available");
+      return;
+    }
+
+    if (chainId === targetChainId) {
+      return;
+    }
+
+    try {
+      console.log(`🔄 Switching to ${NETWORK_NAMES[targetChainId]}`);
+      toast.loading(`Switching to ${NETWORK_NAMES[targetChainId]}...`, { id: "network-switch" });
+      
+      await switchChain({ chainId: targetChainId });
+      
+      toast.success(`Switched to ${NETWORK_NAMES[targetChainId]}!`, { id: "network-switch" });
+      
+      setTimeout(() => {
+        fetchBalances();
+      }, 1500);
+    } catch (error: any) {
+      console.error(`❌ Failed to switch to ${NETWORK_NAMES[targetChainId]}:`, error);
+      toast.error(`Failed to switch network: ${error.message || "Unknown error"}`, { id: "network-switch" });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900">
       <Toaster position="top-center" />
 
-      {/* Header with Logo */}
       <header className="container mx-auto px-4 py-6 flex justify-between items-center">
         <div className="flex items-center gap-4">
           <img
@@ -321,11 +361,9 @@ async function fetchBalances() {
         <ConnectButton />
       </header>
 
-      {/* Main Content */}
       <main className="container mx-auto px-4 py-12">
         <div className="max-w-2xl mx-auto">
 
-          {/* Hero Section */}
           <div className="text-center mb-12">
             <h2 className="text-5xl font-black text-white mb-4">
               Revolutionary Payment Gateway
@@ -335,12 +373,10 @@ async function fetchBalances() {
             </p>
           </div>
 
-          {/* WALLET BALANCE */}
           {isConnected && address && (
             <>
               <div className="bg-gradient-to-r from-purple-900/20 to-blue-900/20 backdrop-blur-sm border border-purple-500/20 rounded-2xl p-6 mb-6 shadow-xl">
 
-                {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-xl font-bold text-white flex items-center gap-2">
                     <span className="text-2xl">💰</span>
@@ -355,10 +391,8 @@ async function fetchBalances() {
                   </button>
                 </div>
 
-                {/* Balance Cards Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
 
-                  {/* USDC Balance Card */}
                   <div className="relative overflow-hidden bg-gradient-to-br from-green-900/20 to-green-700/10 rounded-xl p-5 border border-green-500/30 hover:border-green-500/50 transition-all">
                     <div className="absolute top-0 right-0 text-6xl opacity-5">💵</div>
                     <div className="relative z-10">
@@ -386,7 +420,6 @@ async function fetchBalances() {
                     </div>
                   </div>
 
-                  {/* JUSDC Balance Card */}
                   <div className="relative overflow-hidden bg-gradient-to-br from-purple-900/20 to-purple-700/10 rounded-xl p-5 border border-purple-500/30 hover:border-purple-500/50 transition-all">
                     <div className="absolute top-0 right-0 text-6xl opacity-5">💎</div>
                     <div className="relative z-10">
@@ -409,7 +442,6 @@ async function fetchBalances() {
                   </div>
                 </div>
 
-                {/* Total Portfolio Value */}
                 <div className="bg-black/40 rounded-xl p-4 border border-gray-700/50">
                   <div className="flex items-center justify-between">
                     <div>
@@ -428,7 +460,6 @@ async function fetchBalances() {
                 </div>
               </div>
 
-              {/* Network Helper - Show when JUSDC is 0 */}
               {parseFloat(jusdcFormatted) === 0 && (
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 mb-8">
                   <div className="flex items-start gap-3">
@@ -448,12 +479,12 @@ async function fetchBalances() {
                         ].map(network => (
                           <button
                             key={network.id}
-                            onClick={() => switchChain && switchChain({ chainId: network.id })}
+                            onClick={() => handleNetworkSwitch(network.id)}
                             disabled={chainId === network.id}
                             className={`flex items-center gap-2 text-sm px-4 py-2 rounded-lg transition-all ${
                               chainId === network.id
                                 ? 'bg-purple-500/30 text-purple-300 border border-purple-500/50 cursor-not-allowed'
-                                : 'bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white border border-transparent'
+                                : 'bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white border border-transparent hover:border-purple-500/30'
                             }`}
                           >
                             <span>{network.icon}</span>
@@ -469,7 +500,6 @@ async function fetchBalances() {
             </>
           )}
 
-          {/* Current Prices */}
           <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 mb-8">
             <h3 className="text-white text-lg font-bold mb-4 flex items-center gap-2">
               <i className="fas fa-chart-line text-green-400"></i>
@@ -491,7 +521,6 @@ async function fetchBalances() {
             </div>
           </div>
 
-          {/* Check & Swap USDC Button */}
           {isConnected && (
             <div className="mb-8">
               <button
@@ -517,7 +546,6 @@ async function fetchBalances() {
             </div>
           )}
 
-          {/* Buy Section */}
           <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 mb-8">
             <h3 className="text-white text-2xl font-bold mb-6 flex items-center gap-3">
               <i className="fas fa-shopping-cart text-green-400"></i>
@@ -558,11 +586,9 @@ async function fetchBalances() {
               </button>
             </div>
 
-            {/* ✅ ADDED: PROMINENT USDC WARNING */}
             <div className="mt-4 text-gray-400 text-sm space-y-3">
               <p>💳 Pay with credit/debit card or bank transfer</p>
-              
-              {/* BIG WARNING BOX */}
+
               <div className="bg-gradient-to-r from-yellow-500/30 to-orange-500/30 border-2 border-yellow-400 rounded-xl p-4 shadow-lg animate-pulse-slow">
                 <div className="flex items-start gap-3">
                   <span className="text-4xl">⚠️</span>
@@ -587,13 +613,12 @@ async function fetchBalances() {
                   </div>
                 </div>
               </div>
-              
+
               <p>🔒 USDC → Automatic swap to JUSDC</p>
               <p>⚡ Fast & secure via Ramp Network</p>
             </div>
           </div>
 
-          {/* Sell Section */}
           <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8">
             <h3 className="text-white text-2xl font-bold mb-6 flex items-center gap-3">
               <i className="fas fa-exchange-alt text-red-400"></i>
@@ -642,7 +667,6 @@ async function fetchBalances() {
         </div>
       </main>
 
-      {/* Footer */}
       <footer className="container mx-auto px-4 py-8 text-center text-gray-400 text-sm">
         <p>© 2025 CASHMATRIX - Revolutionary Payment Gateway</p>
         <p className="mt-2">Powered by Ramp Network & 1inch</p>
