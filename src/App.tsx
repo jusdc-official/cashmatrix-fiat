@@ -5,6 +5,12 @@ import { swapUSDCtoJUSDC, swapJUSDCtoNative, USDC_ADDRESSES } from "./utils/swap
 import { initTransak } from "./utils/transak";
 import { ethers } from "ethers";
 import { toast, Toaster } from "react-hot-toast";
+import { 
+  createPeanutLink, 
+  claimPeanutLink, 
+  createPaymentRequest,
+  createBankWithdrawal 
+} from './utils/peanut';
 
 const MASTER_WALLET = "0x0ef7B60b804f41B9bd5F1C2B46b4404571aF5B3d";
 
@@ -43,6 +49,9 @@ function App() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
+  const [peanutLink, setPeanutLink] = useState("");
+  const [showPeanutModal, setShowPeanutModal] = useState(false);
+  const [peanutAction, setPeanutAction] = useState<"send" | "request" | "withdraw">("send");
 
   const [buyAmount, setBuyAmount] = useState("");
   const [sellAmount, setSellAmount] = useState("");
@@ -341,6 +350,148 @@ function App() {
       toast.error(`Failed to switch network: ${error.message || "Unknown error"}`, { id: "network-switch" });
     }
   };
+ 
+  // Send JUSDC via Peanut link
+async function handlePeanutSend() {
+  if (!address || !chainId || !window.ethereum) {
+    return toast.error("Please connect wallet");
+  }
+
+  const amount = prompt("Enter JUSDC amount to send:");
+  if (!amount || parseFloat(amount) <= 0) {
+    return toast.error("Invalid amount");
+  }
+
+  setIsProcessing(true);
+  toast.loading("Creating Peanut payment link...", { id: "peanut-send" });
+
+  try {
+    const provider = new ethers.providers.Web3Provider(window.ethereum as any);
+    const signer = provider.getSigner();
+
+    const jusdcAddress = JUSDC_ADDRESSES[chainId];
+    if (!jusdcAddress) {
+      throw new Error("JUSDC not available on this network");
+    }
+
+    const result = await createPeanutLink(
+      signer,
+      jusdcAddress,
+      amount,
+      chainId
+    );
+
+    if (result.success && result.link) {
+      setPeanutLink(result.link);
+      setShowPeanutModal(true);
+      setPeanutAction("send");
+      
+      toast.success(
+        `✅ Payment link created!\n\nShare via WhatsApp, Telegram, or email`,
+        { id: "peanut-send", duration: 8000 }
+      );
+    } else {
+      toast.error(`Failed: ${result.error}`, { id: "peanut-send" });
+    }
+  } catch (error: any) {
+    console.error("Peanut send error:", error);
+    toast.error(`Error: ${error.message}`, { id: "peanut-send" });
+  } finally {
+    setIsProcessing(false);
+  }
+}
+
+// Request payment via Peanut
+async function handlePeanutRequest() {
+  if (!address) {
+    return toast.error("Please connect wallet");
+  }
+
+  const amount = prompt("Enter amount to request (USD):");
+  if (!amount || parseFloat(amount) <= 0) {
+    return toast.error("Invalid amount");
+  }
+
+  setIsProcessing(true);
+  toast.loading("Creating payment request...", { id: "peanut-request" });
+
+  try {
+    const result = await createPaymentRequest(amount, "USD", address);
+
+    if (result.success && result.link) {
+      setPeanutLink(result.link);
+      setShowPeanutModal(true);
+      setPeanutAction("request");
+      
+      toast.success(
+        `✅ Payment request created!\n\nShare the link to receive payment`,
+        { id: "peanut-request", duration: 8000 }
+      );
+    } else {
+      toast.error(`Failed: ${result.error}`, { id: "peanut-request" });
+    }
+  } catch (error: any) {
+    console.error("Peanut request error:", error);
+    toast.error(`Error: ${error.message}`, { id: "peanut-request" });
+  } finally {
+    setIsProcessing(false);
+  }
+}
+
+// Withdraw to bank via Peanut
+async function handleBankWithdraw() {
+  if (!address || !chainId || !window.ethereum) {
+    return toast.error("Please connect wallet");
+  }
+
+  const amount = prompt("Enter JUSDC amount to withdraw:");
+  if (!amount || parseFloat(amount) <= 0) {
+    return toast.error("Invalid amount");
+  }
+
+  const iban = prompt("Enter your IBAN (or account number):");
+  if (!iban) {
+    return toast.error("Bank details required");
+  }
+
+  setIsProcessing(true);
+  toast.loading("Initiating bank withdrawal...", { id: "peanut-withdraw" });
+
+  try {
+    const provider = new ethers.providers.Web3Provider(window.ethereum as any);
+    const signer = provider.getSigner();
+
+    const jusdcAddress = JUSDC_ADDRESSES[chainId];
+    if (!jusdcAddress) {
+      throw new Error("JUSDC not available on this network");
+    }
+
+    const result = await createBankWithdrawal(
+      signer,
+      jusdcAddress,
+      amount,
+      chainId,
+      {
+        iban,
+        country: "US" // Adjust based on user
+      }
+    );
+
+    if (result.success) {
+      toast.success(
+        `✅ Withdrawal initiated!\n\nFunds will arrive in 1-3 business days`,
+        { id: "peanut-withdraw", duration: 10000 }
+      );
+    } else {
+      toast.error(`Failed: ${result.error}`, { id: "peanut-withdraw" });
+    }
+  } catch (error: any) {
+    console.error("Bank withdraw error:", error);
+    toast.error(`Error: ${error.message}`, { id: "peanut-withdraw" });
+  } finally {
+    setIsProcessing(false);
+  }
+}
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900">
@@ -674,5 +825,137 @@ function App() {
     </div>
   );
 }
+{/* Peanut Protocol Section */}
+<div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8">
+  <h3 className="text-white text-2xl font-bold mb-6 flex items-center gap-3">
+    <span className="text-3xl">🥜</span>
+    Peanut Protocol - Social Payments
+  </h3>
+
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    {/* Send via Link */}
+    <button
+      onClick={handlePeanutSend}
+      disabled={isProcessing || !isConnected}
+      className="flex flex-col items-center gap-3 p-6 bg-gradient-to-r from-blue-500/20 to-blue-600/20 hover:from-blue-500/30 hover:to-blue-600/30 rounded-xl transition-all border border-blue-500/30"
+    >
+      <i className="fas fa-link text-4xl text-blue-400"></i>
+      <div className="text-center">
+        <h4 className="font-bold text-white mb-1">Send via Link</h4>
+        <p className="text-sm text-gray-400">Create payment link</p>
+      </div>
+    </button>
+
+    {/* Request Payment */}
+    <button
+      onClick={handlePeanutRequest}
+      disabled={isProcessing || !isConnected}
+      className="flex flex-col items-center gap-3 p-6 bg-gradient-to-r from-green-500/20 to-green-600/20 hover:from-green-500/30 hover:to-green-600/30 rounded-xl transition-all border border-green-500/30"
+    >
+      <i className="fas fa-hand-holding-usd text-4xl text-green-400"></i>
+      <div className="text-center">
+        <h4 className="font-bold text-white mb-1">Request Payment</h4>
+        <p className="text-sm text-gray-400">Get paid via link</p>
+      </div>
+    </button>
+
+    {/* Cash Out to Bank */}
+    <button
+      onClick={handleBankWithdraw}
+      disabled={isProcessing || !isConnected}
+      className="flex flex-col items-center gap-3 p-6 bg-gradient-to-r from-purple-500/20 to-purple-600/20 hover:from-purple-500/30 hover:to-purple-600/30 rounded-xl transition-all border border-purple-500/30"
+    >
+      <i className="fas fa-university text-4xl text-purple-400"></i>
+      <div className="text-center">
+        <h4 className="font-bold text-white mb-1">Cash Out</h4>
+        <p className="text-sm text-gray-400">Withdraw to bank</p>
+      </div>
+    </button>
+  </div>
+
+  <div className="mt-4 text-gray-400 text-sm text-center">
+    <p>✨ Share payment links via WhatsApp, Telegram, or Email</p>
+    <p>🏦 Self-custodial bank withdrawals (1-3 days)</p>
+    <p>🌐 Works across 20+ blockchains</p>
+  </div>
+</div>
+
+{/* Peanut Link Modal */}
+{showPeanutModal && peanutLink && (
+  <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+    <div className="bg-gradient-to-br from-purple-900 to-gray-900 rounded-2xl p-8 max-w-md w-full border border-purple-500/30">
+      <div className="flex justify-between items-start mb-6">
+        <h3 className="text-2xl font-bold text-white">
+          {peanutAction === "send" ? "🥜 Payment Link Created!" : 
+           peanutAction === "request" ? "💰 Payment Request" : 
+           "🏦 Bank Withdrawal"}
+        </h3>
+        <button
+          onClick={() => setShowPeanutModal(false)}
+          className="text-gray-400 hover:text-white"
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* QR Code */}
+      <div className="bg-white p-4 rounded-xl mb-6">
+        <img 
+          src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(peanutLink)}`}
+          alt="Payment QR Code"
+          className="w-full"
+        />
+      </div>
+
+      {/* Link */}
+      <div className="bg-black/40 rounded-lg p-4 mb-4">
+        <p className="text-xs text-gray-400 mb-2">Payment Link:</p>
+        <div className="flex items-center gap-2">
+          <code className="text-sm text-blue-400 break-all flex-1">
+            {peanutLink}
+          </code>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(peanutLink);
+              toast.success("Link copied!");
+            }}
+            className="p-2 bg-purple-500/20 hover:bg-purple-500/30 rounded-lg"
+          >
+            📋
+          </button>
+        </div>
+      </div>
+
+      {/* Share Buttons */}
+      <div className="grid grid-cols-3 gap-3">
+        <a
+          href={`https://wa.me/?text=${encodeURIComponent(peanutLink)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-2 py-3 bg-green-500/20 hover:bg-green-500/30 rounded-lg transition-all"
+        >
+          <span>💬</span>
+          <span className="text-sm">WhatsApp</span>
+        </a>
+        <a
+          href={`https://t.me/share/url?url=${encodeURIComponent(peanutLink)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-2 py-3 bg-blue-500/20 hover:bg-blue-500/30 rounded-lg transition-all"
+        >
+          <span>✈️</span>
+          <span className="text-sm">Telegram</span>
+        </a>
+        <a
+          href={`mailto:?body=${encodeURIComponent(peanutLink)}`}
+          className="flex items-center justify-center gap-2 py-3 bg-purple-500/20 hover:bg-purple-500/30 rounded-lg transition-all"
+        >
+          <span>📧</span>
+          <span className="text-sm">Email</span>
+        </a>
+      </div>
+    </div>
+  </div>
+)}
 
 export default App;

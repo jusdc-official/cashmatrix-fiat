@@ -25,3 +25,15 @@ dist-ssr
 .vercel
 .env.local
 .env
+
+# Environment variables
+.env
+.env.local
+.env.production
+.env.development
+
+# Sensitive files
+*.key
+*.pem
+*.secret
+.env
