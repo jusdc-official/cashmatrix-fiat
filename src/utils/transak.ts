@@ -16,57 +16,88 @@ export function initTransak(
 
   try {
     const rampUrl = new URL('https://app.ramp.network/');
+    
+    // Host configuration
     rampUrl.searchParams.append('hostAppName', 'CASHMATRIX');
-    
-    // Use CASHMATRIX logo in Ramp widget
     rampUrl.searchParams.append('hostLogoUrl', 'https://jusdc.io/logos/cashmatrix.png');
-    
+
+    // User configuration
     rampUrl.searchParams.append('userAddress', walletAddress);
+    
+    // Fiat configuration
     rampUrl.searchParams.append('fiatValue', amountUSD.toString());
     rampUrl.searchParams.append('fiatCurrency', 'USD');
-    
+
+    // Force USDC only
     const asset = `${networkMap[network]}_USDC`;
     rampUrl.searchParams.append('swapAsset', asset);
     rampUrl.searchParams.append('defaultAsset', asset);
-    
+
     const width = 500;
     const height = 750;
     const left = (window.screen.width - width) / 2;
     const top = (window.screen.height - height) / 2;
-    
+
+    // ✅ IMPROVED: Better popup features to reduce CORS issues
+    const features = `
+      width=${width},
+      height=${height},
+      left=${left},
+      top=${top},
+      toolbar=no,
+      menubar=no,
+      scrollbars=yes,
+      resizable=yes,
+      location=no,
+      status=no
+    `.replace(/\s/g, '');
+
     const popup = window.open(
       rampUrl.toString(),
       'RampNetwork',
-      `width=${width},height=${height},left=${left},top=${top}`
+      features
     );
-    
+
     if (!popup) {
-      toast.error('Please allow popups');
+      toast.error('Please allow popups for CASHMATRIX');
       onClose();
       return;
     }
-    
-    toast.success('🔒 Purchasing USDC only', { duration: 3000 });
+
+    toast.success('🔒 Opening Ramp - Select USDC only!', { duration: 4000 });
+
+    // ✅ IMPROVED: Better popup monitoring
+    let checkCount = 0;
+    const maxChecks = 600; // 5 minutes max
     
     const checkClosed = setInterval(() => {
-      if (popup.closed) {
+      checkCount++;
+      
+      try {
+        if (popup.closed) {
+          clearInterval(checkClosed);
+          
+          toast(
+            '⏳ If you purchased USDC, wait 1-2 minutes\n' +
+            '✅ Then click "Check & Swap USDC to JUSDC"',
+            { duration: 15000, icon: 'ℹ️' }
+          );
+
+          onSuccess({ message: 'Check your wallet in 1-2 minutes' });
+          onClose();
+        }
+      } catch (e) {
+        // Ignore CORS errors when checking popup
+      }
+      
+      // Timeout after 5 minutes
+      if (checkCount >= maxChecks) {
         clearInterval(checkClosed);
-        
-        toast(
-          'Purchase window closed.\n\n' +
-          '⏳ Wait 1-2 minutes for blockchain confirmation\n' +
-          '✅ Then click "Check & Swap USDC" button',
-          { 
-            duration: 15000,
-            icon: 'ℹ️',
-          }
-        );
-        
-        onSuccess({ message: 'Check your wallet in 1-2 minutes' });
+        toast('Purchase window timed out', { duration: 5000 });
         onClose();
       }
     }, 500);
-    
+
   } catch (error) {
     console.error('❌ Ramp error:', error);
     toast.error('Failed to open payment');
