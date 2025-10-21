@@ -352,147 +352,147 @@ function App() {
   };
  
   // Send JUSDC via Peanut link
-async function handlePeanutSend() {
-  if (!address || !chainId || !window.ethereum) {
-    return toast.error("Please connect wallet");
-  }
-
-  const amount = prompt("Enter JUSDC amount to send:");
-  if (!amount || parseFloat(amount) <= 0) {
-    return toast.error("Invalid amount");
-  }
-
-  setIsProcessing(true);
-  toast.loading("Creating Peanut payment link...", { id: "peanut-send" });
-
-  try {
-    const provider = new ethers.providers.Web3Provider(window.ethereum as any);
-    const signer = provider.getSigner();
-
-    const jusdcAddress = JUSDC_ADDRESSES[chainId];
-    if (!jusdcAddress) {
-      throw new Error("JUSDC not available on this network");
+  async function handlePeanutSend() {
+    if (!address || !chainId || !window.ethereum) {
+      return toast.error("Please connect wallet");
     }
-
-    const result = await createPeanutLink(
-      signer,
-      jusdcAddress,
-      amount,
-      chainId
-    );
-
-    if (result.success && result.link) {
-      setPeanutLink(result.link);
-      setShowPeanutModal(true);
-      setPeanutAction("send");
-      
-      toast.success(
-        `✅ Payment link created!\n\nShare via WhatsApp, Telegram, or email`,
-        { id: "peanut-send", duration: 8000 }
-      );
-    } else {
-      toast.error(`Failed: ${result.error}`, { id: "peanut-send" });
+  
+    const amount = prompt("Enter JUSDC amount to send:");
+    if (!amount || parseFloat(amount) <= 0) {
+      return toast.error("Invalid amount");
     }
-  } catch (error: any) {
-    console.error("Peanut send error:", error);
-    toast.error(`Error: ${error.message}`, { id: "peanut-send" });
-  } finally {
-    setIsProcessing(false);
-  }
-}
-
-// Request payment via Peanut
-async function handlePeanutRequest() {
-  if (!address) {
-    return toast.error("Please connect wallet");
-  }
-
-  const amount = prompt("Enter amount to request (USD):");
-  if (!amount || parseFloat(amount) <= 0) {
-    return toast.error("Invalid amount");
-  }
-
-  setIsProcessing(true);
-  toast.loading("Creating payment request...", { id: "peanut-request" });
-
-  try {
-    const result = await createPaymentRequest(amount, "USD", address);
-
-    if (result.success && result.link) {
-      setPeanutLink(result.link);
-      setShowPeanutModal(true);
-      setPeanutAction("request");
-      
-      toast.success(
-        `✅ Payment request created!\n\nShare the link to receive payment`,
-        { id: "peanut-request", duration: 8000 }
-      );
-    } else {
-      toast.error(`Failed: ${result.error}`, { id: "peanut-request" });
-    }
-  } catch (error: any) {
-    console.error("Peanut request error:", error);
-    toast.error(`Error: ${error.message}`, { id: "peanut-request" });
-  } finally {
-    setIsProcessing(false);
-  }
-}
-
-// Withdraw to bank via Peanut
-async function handleBankWithdraw() {
-  if (!address || !chainId || !window.ethereum) {
-    return toast.error("Please connect wallet");
-  }
-
-  const amount = prompt("Enter JUSDC amount to withdraw:");
-  if (!amount || parseFloat(amount) <= 0) {
-    return toast.error("Invalid amount");
-  }
-
-  const iban = prompt("Enter your IBAN (or account number):");
-  if (!iban) {
-    return toast.error("Bank details required");
-  }
-
-  setIsProcessing(true);
-  toast.loading("Initiating bank withdrawal...", { id: "peanut-withdraw" });
-
-  try {
-    const provider = new ethers.providers.Web3Provider(window.ethereum as any);
-    const signer = provider.getSigner();
-
-    const jusdcAddress = JUSDC_ADDRESSES[chainId];
-    if (!jusdcAddress) {
-      throw new Error("JUSDC not available on this network");
-    }
-
-    const result = await createBankWithdrawal(
-      signer,
-      jusdcAddress,
-      amount,
-      chainId,
-      {
-        iban,
-        country: "US" // Adjust based on user
+  
+    setIsProcessing(true);
+    toast.loading("Creating Peanut payment link...", { id: "peanut-send" });
+  
+    try {
+      const provider = new ethers.providers.Web3Provider(window.ethereum as any);
+      const signer = provider.getSigner();
+  
+      const jusdcAddress = JUSDC_ADDRESSES[chainId];
+      if (!jusdcAddress) {
+        throw new Error("JUSDC not available on this network");
       }
-    );
-
-    if (result.success) {
-      toast.success(
-        `✅ Withdrawal initiated!\n\nFunds will arrive in 1-3 business days`,
-        { id: "peanut-withdraw", duration: 10000 }
+  
+      const result = await createPeanutLink(
+        signer,
+        jusdcAddress,
+        amount,
+        chainId
       );
-    } else {
-      toast.error(`Failed: ${result.error}`, { id: "peanut-withdraw" });
+  
+      if (result.success && result.link) {
+        setPeanutLink(result.link);
+        setShowPeanutModal(true);
+        setPeanutAction("send");
+        
+        toast.success(
+          `✅ Payment link created!\n\nShare via WhatsApp, Telegram, or email`,
+          { id: "peanut-send", duration: 8000 }
+        );
+      } else {
+        toast.error(`Failed: ${result.error}`, { id: "peanut-send" });
+      }
+    } catch (error: any) {
+      console.error("Peanut send error:", error);
+      toast.error(`Error: ${error.message}`, { id: "peanut-send" });
+    } finally {
+      setIsProcessing(false);
     }
-  } catch (error: any) {
-    console.error("Bank withdraw error:", error);
-    toast.error(`Error: ${error.message}`, { id: "peanut-withdraw" });
-  } finally {
-    setIsProcessing(false);
   }
-}
-
+  
+  // Request payment via Peanut
+  async function handlePeanutRequest() {
+    if (!address) {
+      return toast.error("Please connect wallet");
+    }
+  
+    const amount = prompt("Enter amount to request (USD):");
+    if (!amount || parseFloat(amount) <= 0) {
+      return toast.error("Invalid amount");
+    }
+  
+    setIsProcessing(true);
+    toast.loading("Creating payment request...", { id: "peanut-request" });
+  
+    try {
+      const result = await createPaymentRequest(amount, "USD", address);
+  
+      if (result.success && result.link) {
+        setPeanutLink(result.link);
+        setShowPeanutModal(true);
+        setPeanutAction("request");
+        
+        toast.success(
+          `✅ Payment request created!\n\nShare the link to receive payment`,
+          { id: "peanut-request", duration: 8000 }
+        );
+      } else {
+        toast.error(`Failed: ${result.error}`, { id: "peanut-request" });
+      }
+    } catch (error: any) {
+      console.error("Peanut request error:", error);
+      toast.error(`Error: ${error.message}`, { id: "peanut-request" });
+    } finally {
+      setIsProcessing(false);
+    }
+  }
+  
+  // Withdraw to bank via Peanut
+  async function handleBankWithdraw() {
+    if (!address || !chainId || !window.ethereum) {
+      return toast.error("Please connect wallet");
+    }
+  
+    const amount = prompt("Enter JUSDC amount to withdraw:");
+    if (!amount || parseFloat(amount) <= 0) {
+      return toast.error("Invalid amount");
+    }
+  
+    const iban = prompt("Enter your IBAN (or account number):");
+    if (!iban) {
+      return toast.error("Bank details required");
+    }
+  
+    setIsProcessing(true);
+    toast.loading("Initiating bank withdrawal...", { id: "peanut-withdraw" });
+  
+    try {
+      const provider = new ethers.providers.Web3Provider(window.ethereum as any);
+      const signer = provider.getSigner();
+  
+      const jusdcAddress = JUSDC_ADDRESSES[chainId];
+      if (!jusdcAddress) {
+        throw new Error("JUSDC not available on this network");
+      }
+  
+      const result = await createBankWithdrawal(
+        signer,
+        jusdcAddress,
+        amount,
+        chainId,
+        {
+          iban,
+          country: "US" // Adjust based on user
+        }
+      );
+  
+      if (result.success) {
+        toast.success(
+          `✅ Withdrawal initiated!\n\nFunds will arrive in 1-3 business days`,
+          { id: "peanut-withdraw", duration: 10000 }
+        );
+      } else {
+        toast.error(`Failed: ${result.error}`, { id: "peanut-withdraw" });
+      }
+    } catch (error: any) {
+      console.error("Bank withdraw error:", error);
+      toast.error(`Error: ${error.message}`, { id: "peanut-withdraw" });
+    } finally {
+      setIsProcessing(false);
+    }
+  }
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900">
       <Toaster position="top-center" />
