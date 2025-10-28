@@ -1,4 +1,3 @@
-import peanut from '@squirrel-labs/peanut-sdk';
 import { ethers } from 'ethers';
 
 // Peanut API Key from environment
@@ -13,7 +12,7 @@ export interface PeanutLinkResult {
 }
 
 /**
- * Create a Peanut payment link to send crypto
+ * Create a Peanut payment link by redirecting to Peanut.to
  * @param signer - Ethers signer from wallet
  * @param tokenAddress - ERC20 token contract address
  * @param tokenAmount - Amount to send (in human-readable format)
@@ -28,58 +27,42 @@ export async function createPeanutLink(
   tokenType: 'ERC20' | 'NATIVE' = 'ERC20'
 ): Promise<PeanutLinkResult> {
   try {
-    console.log('🥜 Creating Peanut link...');
+    console.log('🥜 Opening Peanut Protocol...');
     console.log('Token:', tokenAddress);
     console.log('Amount:', tokenAmount);
     console.log('Chain:', chainId);
 
-    // Determine decimals based on token type and chain
-    let tokenDecimals = 18; // Default
-    if (tokenType === 'ERC20') {
-      // JUSDC uses 18 decimals on Ethereum, 6 on others
-      tokenDecimals = chainId === 1 ? 18 : 6;
-    }
-
-    const linkDetails = {
+    // Build Peanut.to URL with pre-filled parameters
+    const params = new URLSearchParams({
       chainId: chainId.toString(),
-      tokenAmount,
-      tokenType,
-      tokenAddress: tokenType === 'NATIVE' ? ethers.constants.AddressZero : tokenAddress,
-      tokenDecimals,
-    };
-
-    console.log('Link details:', linkDetails);
-
-    // Create the Peanut link
-    const result = await peanut.createLink({
-      structSigner: {
-        signer
-      },
-      linkDetails
+      tokenAddress: tokenAddress,
+      tokenAmount: tokenAmount,
+      tokenType: tokenType.toLowerCase()
     });
 
-    console.log('✅ Peanut link created successfully!');
-    console.log('Link:', result.link);
-    console.log('TxHash:', result.txHash);
-
+    const peanutUrl = `https://peanut.to/send?${params.toString()}`;
+    
+    console.log('🔗 Opening:', peanutUrl);
+    
+    // Open Peanut in new tab
+    window.open(peanutUrl, '_blank', 'noopener,noreferrer');
+    
     return {
       success: true,
-      link: result.link,
-      txHash: result.txHash,
-      qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(result.link)}`
+      link: peanutUrl,
+      qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(peanutUrl)}`
     };
   } catch (error: any) {
-    console.error('❌ Peanut link creation error:', error);
-    console.error('Error details:', error.message, error.code);
+    console.error('❌ Error opening Peanut:', error);
     return {
       success: false,
-      error: error.message || 'Failed to create Peanut link'
+      error: error.message || 'Failed to open Peanut Protocol'
     };
   }
 }
 
 /**
- * Claim tokens from a Peanut link (GASLESS with API key)
+ * Claim tokens from a Peanut link
  * @param link - Peanut payment link
  * @param recipientAddress - Address to receive tokens
  */
@@ -88,61 +71,21 @@ export async function claimPeanutLink(
   recipientAddress: string
 ): Promise<PeanutLinkResult> {
   try {
-    console.log('🥜 Claiming Peanut link...');
-    console.log('Link:', link);
-    console.log('Recipient:', recipientAddress);
-
-    if (!PEANUT_API_KEY) {
-      console.warn('⚠️ No API key - user will pay gas');
-      
-      // Fallback to regular claim (user pays gas)
-      const result = await peanut.claimLink({
-        link,
-        recipientAddress
-      });
-
-      console.log('✅ Link claimed (user paid gas):', result.txHash);
-      return {
-        success: true,
-        txHash: result.txHash
-      };
-    }
-
-    // Gasless claim with API key
-    const result = await peanut.claimLinkGasless({
-      link,
-      recipientAddress,
-      APIKey: PEANUT_API_KEY,
-    });
-
-    console.log('✅ Link claimed (gasless):', result.txHash);
-
+    console.log('🥜 Opening Peanut claim page...');
+    
+    // Open the claim link in new tab
+    window.open(link, '_blank', 'noopener,noreferrer');
+    
     return {
       success: true,
-      txHash: result.txHash
+      link: link
     };
   } catch (error: any) {
-    console.error('❌ Peanut claim error:', error);
-    
-    // Try fallback to regular claim
-    try {
-      console.log('⚠️ Trying fallback (regular claim)...');
-      const result = await peanut.claimLink({
-        link,
-        recipientAddress
-      });
-      console.log('✅ Fallback claim succeeded:', result.txHash);
-      return {
-        success: true,
-        txHash: result.txHash
-      };
-    } catch (fallbackError: any) {
-      console.error('❌ Fallback also failed:', fallbackError);
-      return {
-        success: false,
-        error: fallbackError.message || 'Failed to claim Peanut link'
-      };
-    }
+    console.error('❌ Error opening claim page:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to open claim page'
+    };
   }
 }
 
@@ -151,25 +94,17 @@ export async function claimPeanutLink(
  * @param link - Peanut payment link
  */
 export async function getPeanutLinkInfo(link: string) {
-  try {
-    console.log('🥜 Getting link info...');
-    const info = await peanut.getLinkDetails(link);
-    console.log('✅ Link info:', info);
-    return { 
-      success: true, 
-      data: info 
-    };
-  } catch (error: any) {
-    console.error('❌ Get link info error:', error);
-    return { 
-      success: false, 
-      error: error.message 
-    };
-  }
+  return {
+    success: true,
+    data: {
+      message: 'Open the link in your browser to view details',
+      link: link
+    }
+  };
 }
 
 /**
- * Create a payment request (for receiving payments)
+ * Create a payment request (opens Peanut.to receive page)
  * @param amount - Amount to request
  * @param currency - Currency (USD, EUR, etc)
  * @param recipientAddress - Address to receive payment
@@ -180,51 +115,27 @@ export async function createPaymentRequest(
   recipientAddress: string
 ): Promise<PeanutLinkResult> {
   try {
-    console.log('🥜 Creating payment request...');
-
-    if (!PEANUT_API_KEY) {
-      throw new Error('API key required for payment requests');
-    }
-
-    const response = await fetch('https://api.peanut.to/request', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'api-key': PEANUT_API_KEY
-      },
-      body: JSON.stringify({
-        amount,
-        currency,
-        recipient: recipientAddress
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || `API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    console.log('✅ Payment request created:', data);
-
-    const paymentUrl = data.link || data.url || data.hosted_url;
-
+    console.log('🥜 Opening Peanut request page...');
+    
+    const peanutUrl = `https://peanut.to/request?amount=${amount}&currency=${currency}&recipient=${recipientAddress}`;
+    
+    window.open(peanutUrl, '_blank', 'noopener,noreferrer');
+    
     return {
       success: true,
-      link: paymentUrl,
-      qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(paymentUrl)}`
+      link: peanutUrl
     };
   } catch (error: any) {
-    console.error('❌ Payment request error:', error);
+    console.error('❌ Error opening request page:', error);
     return {
       success: false,
-      error: error.message || 'Failed to create payment request'
+      error: error.message || 'Failed to open request page'
     };
   }
 }
 
 /**
- * Create bank withdrawal (off-ramp) - Requires Peanut team approval
+ * Create bank withdrawal (off-ramp)
  * @param signer - Ethers signer
  * @param tokenAddress - Token to withdraw
  * @param amount - Amount to withdraw
@@ -244,57 +155,33 @@ export async function createBankWithdrawal(
   }
 ): Promise<PeanutLinkResult> {
   try {
-    console.log('🥜 Creating bank withdrawal...');
-
-    if (!PEANUT_API_KEY) {
-      throw new Error('API key required for bank withdrawals');
-    }
-
-    // First create a link with the tokens
+    console.log('🥜 Opening Peanut off-ramp page...');
+    
+    // First create a link
     const linkResult = await createPeanutLink(
       signer,
       tokenAddress,
       amount,
       chainId
     );
-
-    if (!linkResult.success || !linkResult.link) {
+    
+    if (!linkResult.success) {
       return linkResult;
     }
-
-    console.log('Link created, initiating off-ramp...');
-
-    // Then initiate off-ramp
-    const response = await fetch('https://api.peanut.to/offramp', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'api-key': PEANUT_API_KEY
-      },
-      body: JSON.stringify({
-        link: linkResult.link,
-        bankDetails
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || `Off-ramp error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    console.log('✅ Bank withdrawal initiated:', data);
-
+    
+    // Then redirect to off-ramp page
+    const offrampUrl = `https://peanut.to/offramp`;
+    window.open(offrampUrl, '_blank', 'noopener,noreferrer');
+    
     return {
       success: true,
-      link: data.withdrawal_url || data.url,
-      txHash: linkResult.txHash
+      link: offrampUrl
     };
   } catch (error: any) {
-    console.error('❌ Bank withdrawal error:', error);
+    console.error('❌ Error opening off-ramp:', error);
     return {
       success: false,
-      error: error.message || 'Failed to create bank withdrawal'
+      error: error.message || 'Failed to open off-ramp page'
     };
   }
 }
@@ -307,7 +194,7 @@ export async function createBankWithdrawal(
 export function generateShareLinks(link: string, message: string = 'Send me JUSDC!') {
   const encodedLink = encodeURIComponent(link);
   const encodedMessage = encodeURIComponent(message);
-  
+
   return {
     whatsapp: `https://wa.me/?text=${encodedMessage}%20${encodedLink}`,
     telegram: `https://t.me/share/url?url=${encodedLink}&text=${encodedMessage}`,
@@ -338,13 +225,15 @@ export function parsePeanutLink(link: string) {
   try {
     const url = new URL(link);
     const params = new URLSearchParams(url.search);
-    
+
     return {
-      chainId: params.get('c'),
+      chainId: params.get('c') || params.get('chainId'),
       index: params.get('i'),
       version: params.get('v'),
       password: params.get('p'),
-      valid: !!(params.get('c') && params.get('i') && params.get('v') && params.get('p'))
+      tokenAddress: params.get('tokenAddress'),
+      tokenAmount: params.get('tokenAmount'),
+      valid: !!url.hostname.includes('peanut.to')
     };
   } catch (error) {
     console.error('Invalid Peanut link:', error);
@@ -370,7 +259,7 @@ export function formatAmount(amount: string, decimals: number = 6): string {
   try {
     const value = parseFloat(amount);
     if (isNaN(value)) return '0.00';
-    
+
     return value.toLocaleString('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: decimals
@@ -407,7 +296,7 @@ export function hasApiKey(): boolean {
  */
 export function getApiKeyStatus(): string {
   if (hasApiKey()) {
-    return '✅ Gasless claims enabled';
+    return '✅ Peanut Protocol integration enabled';
   }
-  return '⚠️ No API key - users pay gas';
+  return '⚠️ Using Peanut.to web interface';
 }
